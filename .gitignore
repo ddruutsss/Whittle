@@ -1,0 +1,14 @@
+# Build output (release builds are attached to GitHub Releases instead)
+/dist/
+/obj/
+
+# Self-test reports
+selftest*.txt
+
+# Editors and OS
+.vs/
+.vscode/
+*.user
+*.suo
+Thumbs.db
+desktop.ini

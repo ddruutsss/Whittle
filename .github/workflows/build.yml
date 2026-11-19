@@ -1,0 +1,53 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Whittle.exe
+        shell: powershell
+        run: .\build.ps1
+
+      - name: Build test version
+        shell: powershell
+        run: .\build.ps1 -Dev
+
+      - name: Run self-test
+        shell: powershell
+        run: |
+          $report = Join-Path $PWD 'selftest.txt'
+          $p = Start-Process -FilePath .\obj\dev\Whittle-dev.exe -ArgumentList '--selftest', "`"$report`"" -PassThru -Wait
+          Get-Content $report
+          if ($p.ExitCode -ne 0) { throw "$($p.ExitCode) self-test checks failed" }
+
+      - name: Upload Whittle.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: Whittle
+          path: dist/Whittle.exe
+
+      - name: Attach Whittle.exe to the release
+        if: github.event_name == 'release'
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $version = [regex]::Match((Get-Content src\Brand.cs -Raw), 'Version = "([^"]+)"').Groups[1].Value
+          if ($env:TAG.TrimStart('v') -ne $version) {
+            throw "Release tag $env:TAG doesn't match Brand.Version ($version) in src\Brand.cs"
+          }
+          gh release upload $env:TAG dist\Whittle.exe --clobber
